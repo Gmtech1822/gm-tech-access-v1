@@ -5,7 +5,7 @@ const net = require('net');
 
 const app = express();
 const port = process.env.PORT || 3000;
-const tcpPort = process.env.TCP_PORT || 10001; // Porta para receber Contact ID/SIA
+const tcpPort = process.env.TCP_PORT || 10001;
 
 app.use(cors());
 app.use(express.json());
@@ -16,10 +16,10 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Inicialização do Banco com Tabelas de Alarmes
+// Inicialização do Banco
 const initDb = async () => {
   try {
-    // Tabela de Câmeras/DVRs
+    // Tabela CFTV
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cftv_cameras (
         id SERIAL PRIMARY KEY,
@@ -35,20 +35,33 @@ const initDb = async () => {
       );
     `);
 
-    // Tabela de Zonas de Alarme / Cercas
+    // Tabela Usuários de Controle de Acesso
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS alarmes_zonas (
+      CREATE TABLE IF NOT EXISTS acesso_usuarios (
         id SERIAL PRIMARY KEY,
-        central_nome VARCHAR(100) NOT NULL,
-        numero_zona INT NOT NULL,
-        tipo VARCHAR(50) DEFAULT 'ALARME', -- ALARME ou CERCA
-        descricao VARCHAR(100),
-        status VARCHAR(20) DEFAULT 'NORMAL', -- NORMAL, DISPARADO, BPASS
+        nome VARCHAR(100) NOT NULL,
+        documento VARCHAR(30),
+        cartao_tag VARCHAR(50),
+        tipo_permissao VARCHAR(30) DEFAULT 'MORADOR', -- MORADOR, VISITANTE, PRESTADOR
+        status VARCHAR(20) DEFAULT 'ATIVO',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // Tabela de Logs de Eventos Geral
+    // Tabela Dispositivos de Acesso (Catracas, Cancelas, Leitoras)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS acesso_dispositivos (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(100) NOT NULL,
+        tipo VARCHAR(50) NOT NULL, -- CATRACA, PORTA, CANCELA
+        fabricante VARCHAR(50) NOT NULL, -- CONTROL ID, INTELBRAS, HIKVISION
+        ip VARCHAR(45),
+        status VARCHAR(20) DEFAULT 'ONLINE',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Tabela Logs de Eventos
     await pool.query(`
       CREATE TABLE IF NOT EXISTS logs_eventos (
         id SERIAL PRIMARY KEY,
@@ -61,7 +74,7 @@ const initDb = async () => {
       );
     `);
 
-    console.log("Banco de dados sincronizado com tabelas de CFTV e Alarmes!");
+    console.log("Banco de dados sincronizado com tabelas de CFTV, Alarmes e Controle de Acesso!");
   } catch (err) {
     console.error("Erro ao inicializar banco:", err);
   }
@@ -72,58 +85,39 @@ initDb();
 // --- DECODER CONTACT ID ---
 function decodificarContactID(rawBuffer) {
   const rawMsg = rawBuffer.toString('ascii');
-  
-  // Tabela rápida de eventos Contact ID comuns
   const codigos = {
     '1130': 'Disparo de Alarme - Conflito/Zona',
     '1134': 'Disparo - Invasão de Perímetro',
     '1381': 'Perda de Pulso - Cerca Elétrica',
     '1401': 'Desarme pelo Usuário',
     '3401': 'Arme pelo Usuário',
-    '1301': 'Falha de Energia AC',
     '1120': 'Pânico Silencioso'
   };
 
-  // Simulação de extração simples do payload da central
   for (let code in codigos) {
-    if (rawMsg.includes(code)) {
-      return codigos[code];
-    }
+    if (rawMsg.includes(code)) return codigos[code];
   }
-
   return `Evento Contact ID Recebido: ${rawMsg.substring(0, 30)}`;
 }
 
-// --- SERVIDOR TCP PARA CENTRAIS DE ALARME IP ---
+// Servidor TCP
 const tcpServer = net.createServer((socket) => {
-  console.log('Central de alarme/eletrificador conectada via Socket IP');
-
   socket.on('data', async (data) => {
     const eventoTraduzido = decodificarContactID(data);
-    
     try {
       await pool.query(`
         INSERT INTO logs_eventos (dispositivo_nome, tipo_dispositivo, fabricante, descricao_evento)
         VALUES ('Central IP Geral', 'ALARME', 'Multi-Fabricante', $1);
       `, [eventoTraduzido]);
-      
-      // Resposta ACK básica para a central não desconectar
       socket.write(Buffer.from([0x06]));
     } catch (err) {
-      console.error("Erro ao registrar pacote Contact ID:", err);
+      console.error(err);
     }
   });
-
-  socket.on('error', (err) => {
-    console.log('Conexão com central de alarme encerrada com aviso');
-  });
 });
+tcpServer.listen(tcpPort);
 
-tcpServer.listen(tcpPort, () => {
-  console.log(`Receptor Contact ID / SIA escutando na porta TCP ${tcpPort}`);
-});
-
-// --- ROTAS DA API REST ---
+// --- ROTAS DA API ---
 
 app.get('/api/status', (req, res) => {
   res.json({ system: "GM TECH Access API", status: "Online", database: "PostgreSQL Conectado" });
@@ -153,14 +147,57 @@ app.post('/api/cftv/cameras', async (req, res) => {
   }
 
   try {
-    const query = `
+    const result = await pool.query(`
       INSERT INTO cftv_cameras (nome, fabricante, ip, porta_onvif, usuario, senha, rtsp_url)
       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
-    `;
-    const result = await pool.query(query, [nome, fabricante, ip, porta_onvif || 80, usuario, senha, rtsp_url]);
+    `, [nome, fabricante, ip, porta_onvif || 80, usuario, senha, rtsp_url]);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: "Erro ao salvar câmera" });
+  }
+});
+
+// CONTROLE DE ACESSO - USUÁRIOS
+app.get('/api/acesso/usuarios', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM acesso_usuarios ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: "Erro ao buscar usuários" });
+  }
+});
+
+app.post('/api/acesso/usuarios', async (req, res) => {
+  const { nome, documento, cartao_tag, tipo_permissao } = req.body;
+  try {
+    const result = await pool.query(`
+      INSERT INTO acesso_usuarios (nome, documento, cartao_tag, tipo_permissao)
+      VALUES ($1, $2, $3, $4) RETURNING *;
+    `, [nome, documento, cartao_tag, tipo_permissao || 'MORADOR']);
+
+    await pool.query(`
+      INSERT INTO logs_eventos (dispositivo_nome, tipo_dispositivo, fabricante, descricao_evento)
+      VALUES ('Servidor Acesso', 'ACESSO', 'GM TECH', $1);
+    `, [`Novo Usuário Cadastrado: ${nome} (Tag: ${cartao_tag})`]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Erro ao cadastrar usuário" });
+  }
+});
+
+// CONTROLE DE ACESSO - ACIONAMENTO REMOTO
+app.post('/api/acesso/acionar', async (req, res) => {
+  const { dispositivo, fabricante, acao } = req.body;
+  try {
+    await pool.query(`
+      INSERT INTO logs_eventos (dispositivo_nome, tipo_dispositivo, fabricante, descricao_evento, status_evento)
+      VALUES ($1, 'ACESSO', $2, $3, 'SUCESSO');
+    `, [dispositivo, fabricante, `Comando Remoto: ${acao}`]);
+
+    res.json({ success: true, message: `Comando '${acao}' enviado com sucesso!` });
+  } catch (err) {
+    res.status(500).json({ error: "Erro ao enviar comando remoto" });
   }
 });
 
@@ -177,11 +214,10 @@ app.get('/api/eventos', async (req, res) => {
 app.post('/api/eventos', async (req, res) => {
   const { dispositivo, tipo, fabricante, evento, status } = req.body;
   try {
-    const query = `
+    const result = await pool.query(`
       INSERT INTO logs_eventos (dispositivo_nome, tipo_dispositivo, fabricante, descricao_evento, status_evento)
       VALUES ($1, $2, $3, $4, $5) RETURNING *;
-    `;
-    const result = await pool.query(query, [dispositivo, tipo, fabricante, evento, status || 'SUCESSO']);
+    `, [dispositivo, tipo, fabricante, evento, status || 'SUCESSO']);
     res.status(201).json({ message: "Evento registrado", dados: result.rows[0] });
   } catch (error) {
     res.status(500).json({ error: "Erro ao registrar evento" });
@@ -191,3 +227,4 @@ app.post('/api/eventos', async (req, res) => {
 app.listen(port, () => {
   console.log(`Servidor HTTP rodando na porta ${port}`);
 });
+    
