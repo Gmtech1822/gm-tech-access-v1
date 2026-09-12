@@ -3,115 +3,150 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GM TECH Access - Central de Integração e Controle</title>
+  <title>GM TECH Access - Central de Segurança</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body { background-color: #0b0f19; color: #e2e8f0; display: flex; flex-direction: column; min-height: 100vh; }
-    
-    /* Header */
-    header { background-color: #111827; border-bottom: 1px solid #1f2937; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
-    .logo { font-size: 1.4rem; font-weight: bold; color: #38bdf8; display: flex; align-items: center; gap: 0.5rem; }
-    .status-badge { background-color: #065f46; color: #34d399; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; }
-    
-    /* Dashboard Grid */
-    main { padding: 2rem; flex: 1; max-width: 1400px; margin: 0 auto; width: 100%; }
-    h2 { margin-bottom: 1.5rem; font-size: 1.25rem; color: #94a3b8; }
-    
-    .grid-modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-    .card { background-color: #1f2937; border: 1px solid #374151; border-radius: 12px; padding: 1.5rem; transition: transform 0.2s; }
-    .card:hover { transform: translateY(-4px); }
-    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .card-title { font-size: 1.1rem; font-weight: 600; color: #f3f4f6; }
-    .card-icon { font-size: 1.5rem; }
-    .card-body { color: #9ca3af; font-size: 0.9rem; line-height: 1.4; }
-    .card-status { margin-top: 1rem; font-weight: bold; font-size: 0.85rem; }
-    .text-online { color: #10b981; }
-    .text-standby { color: #f59e0b; }
-
-    /* Event Logs Table */
-    .logs-section { background-color: #1f2937; border: 1px solid #374151; border-radius: 12px; padding: 1.5rem; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; text-align: left; font-size: 0.9rem; }
-    th { padding: 0.75rem; border-bottom: 1px solid #374151; color: #9ca3af; }
-    td { padding: 0.75rem; border-bottom: 1px solid #2d3748; color: #e5e7eb; }
+    body { background-color: #0f172a; color: #f8fafc; padding: 20px; }
+    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid #334155; margin-bottom: 20px; }
+    h1 { color: #38bdf8; font-size: 1.8rem; }
+    .status-badge { background-color: #22c55e; color: #000; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .card { background-color: #1e293b; padding: 20px; border-radius: 10px; border: 1px solid #334155; }
+    .card h3 { color: #94a3b8; font-size: 1rem; margin-bottom: 10px; }
+    .card .value { font-size: 1.5rem; font-weight: bold; color: #f8fafc; }
+    .table-container { background-color: #1e293b; padding: 20px; border-radius: 10px; border: 1px solid #334155; }
+    .table-container h2 { margin-bottom: 15px; font-size: 1.2rem; color: #38bdf8; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 12px; border-bottom: 1px solid #334155; }
+    th { color: #94a3b8; font-size: 0.9rem; }
+    .badge-success { color: #4ade80; font-weight: bold; }
+    .btn-simular { background-color: #0284c7; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+    .btn-simular:hover { background-color: #0369a1; }
   </style>
 </head>
 <body>
 
   <header>
-    <div class="logo">🛡️ GM TECH Access</div>
-    <div class="status-badge">● Sistema Operacional</div>
+    <h1>GM TECH Access</h1>
+    <span class="status-badge" id="api-status">Conectando...</span>
   </header>
 
-  <main>
-    <h2>Módulos de Integração Ativos</h2>
-    
-    <div class="grid-modules">
-      <!-- CFTV / DVR / NVR -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">CFTV (DVR / NVR)</span>
-          <span class="card-icon">📹</span>
-        </div>
-        <div class="card-body">Monitoramento de vídeo via RTSP / ONVIF (Intelbras, Hikvision, Dahua).</div>
-        <div class="card-status text-online">● 0 Câmeras Conectadas</div>
-      </div>
-
-      <!-- Controle de Acesso -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Controle de Acesso</span>
-          <span class="card-icon">🔑</span>
-        </div>
-        <div class="card-body">Controladoras Wiegand, OSDP e catracas biométricas / facial.</div>
-        <div class="card-status text-online">● Gateway Pronto</div>
-      </div>
-
-      <!-- Alarme e Incêndio -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Centrais de Alarme</span>
-          <span class="card-icon">🚨</span>
-        </div>
-        <div class="card-body">Recepção de disparos Contact ID / SIA IP em tempo real.</div>
-        <div class="card-status text-standby">● Aguardando Eventos</div>
-      </div>
-
-      <!-- Cerca Elétrica -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Cerca Elétrica</span>
-          <span class="card-icon">⚡</span>
-        </div>
-        <div class="card-body">Monitoramento de aterramento, corte e pulso do eletrificador.</div>
-        <div class="card-status text-standby">● Aguardando Eventos</div>
-      </div>
+  <div class="grid">
+    <div class="card">
+      <h3>CFTV (DVR/NVR)</h3>
+      <div class="value">Intelbras / Hikvision</div>
+      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">RTSP / ONVIF Prontos</p>
     </div>
-
-    <!-- Tabela de Logs / Eventos -->
-    <div class="logs-section">
-      <h2>Últimos Eventos do Sistema</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Horário</th>
-            <th>Dispositivo</th>
-            <th>Fabricante</th>
-            <th>Evento</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>21:20:00</td>
-            <td>Servidor Central</td>
-            <td>Render Cloud</td>
-            <td>Inicialização da Plataforma</td>
-            <td class="text-online">Sucesso</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="card">
+      <h3>Controle de Acesso</h3>
+      <div class="value">Catracas & Leitores</div>
+      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Wiegand / OSDP</p>
     </div>
-  </main>
+    <div class="card">
+      <h3>Central de Alarmes</h3>
+      <div class="value">Contact ID / SIA</div>
+      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Monitoramento IP</p>
+    </div>
+    <div class="card">
+      <h3>Cerca Elétrica</h3>
+      <div class="value">Eletrificadores</div>
+      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Status da Malha</p>
+    </div>
+  </div>
 
+  <div class="table-container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h2>Eventos Recentes em Tempo Real</h2>
+      <button class="btn-simular" onclick="simularEvento()">Simular Disparo / Passagem</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Dispositivo</th>
+          <th>Tipo</th>
+          <th>Fabricante</th>
+          <th>Evento</th>
+          <th>Data/Hora</th>
+        </tr>
+      </thead>
+      <tbody id="tabela-eventos">
+        <tr>
+          <td colspan="5" style="text-align: center; color: #64748b;">Carregando eventos do banco PostgreSQL...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_URL = 'https://gm-tech-api.onrender.com/api';
+
+    // Checa status da API
+    async function checarStatus() {
+      try {
+        const res = await fetch(`${API_URL}/status`);
+        const data = await res.json();
+        if(data.status === "Online") {
+          document.getElementById('api-status').innerText = "SISTEMA ONLINE";
+          document.getElementById('api-status').style.backgroundColor = "#22c55e";
+        }
+      } catch (err) {
+        document.getElementById('api-status').innerText = "API OFFLINE";
+        document.getElementById('api-status').style.backgroundColor = "#ef4444";
+      }
+    }
+
+    // Carrega eventos do PostgreSQL
+    async function carregarEventos() {
+      try {
+        const res = await fetch(`${API_URL}/eventos`);
+        const eventos = await res.json();
+        const tbody = document.getElementById('tabela-eventos');
+        
+        if (eventos.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b;">Nenhum evento registrado no banco de dados.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = eventos.map(e => `
+          <tr>
+            <td><strong>${e.dispositivo_nome}</strong></td>
+            <td>${e.tipo_dispositivo}</td>
+            <td>${e.fabricante}</td>
+            <td><span class="badge-success">${e.descricao_evento}</span></td>
+            <td>${new Date(e.recebido_em).toLocaleString('pt-BR')}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error("Erro ao carregar eventos:", err);
+      }
+    }
+
+    // Função para testar gravação no banco
+    async function simularEvento() {
+      const tipos = [
+        { dispositivo: "DVR Portaria", tipo: "CFTV", fabricante: "Intelbras", evento: "Detecção de Movimento - Câmera 01" },
+        { dispositivo: "Catraca Principal", tipo: "ACESSO", fabricante: "Control iD", evento: "Acesso Liberado - Cartão #4829" },
+        { dispositivo: "Central Zonas", tipo: "ALARME", fabricante: "JFL", evento: "Disparo de Alarme - Zona 04" },
+        { dispositivo: "Cerca Perímetro", tipo: "CERCA", fabricante: "Garen", evento: "Perda de Pulso - Setor Norte" }
+      ];
+
+      const eventoAleatorio = tipos[Math.floor(Math.random() * tipos.length)];
+
+      try {
+        await fetch(`${API_URL}/eventos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(eventoAleatorio)
+        });
+        carregarEventos(); // Recarrega a tabela
+      } catch (err) {
+        alert("Erro ao simular evento");
+      }
+    }
+
+    checarStatus();
+    carregarEventos();
+    setInterval(carregarEventos, 5000); // Atualiza a cada 5s
+  </script>
 </body>
 </html>
