@@ -1,36 +1,54 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const net = require('net');
 
 const app = express();
 const port = process.env.PORT || 3000;
+const tcpPort = process.env.TCP_PORT || 10001; // Porta para receber Contact ID/SIA
 
 app.use(cors());
 app.use(express.json());
 
-// Conexão com o PostgreSQL do Render
+// Conexão PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Função para criar as tabelas no banco automaticamente
+// Inicialização do Banco com Tabelas de Alarmes
 const initDb = async () => {
   try {
-    // Tabela de Dispositivos (DVR, Alarme, Controle de Acesso, Cerca)
+    // Tabela de Câmeras/DVRs
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS dispositivos (
+      CREATE TABLE IF NOT EXISTS cftv_cameras (
         id SERIAL PRIMARY KEY,
         nome VARCHAR(100) NOT NULL,
-        tipo VARCHAR(50) NOT NULL,
         fabricante VARCHAR(50) NOT NULL,
-        ip_host VARCHAR(100),
+        ip VARCHAR(45) NOT NULL,
+        porta_onvif INT DEFAULT 80,
+        usuario VARCHAR(50),
+        senha VARCHAR(50),
+        rtsp_url TEXT,
         status VARCHAR(20) DEFAULT 'ONLINE',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // Tabela de Logs de Eventos do Sistema
+    // Tabela de Zonas de Alarme / Cercas
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS alarmes_zonas (
+        id SERIAL PRIMARY KEY,
+        central_nome VARCHAR(100) NOT NULL,
+        numero_zona INT NOT NULL,
+        tipo VARCHAR(50) DEFAULT 'ALARME', -- ALARME ou CERCA
+        descricao VARCHAR(100),
+        status VARCHAR(20) DEFAULT 'NORMAL', -- NORMAL, DISPARADO, BPASS
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Tabela de Logs de Eventos Geral
     await pool.query(`
       CREATE TABLE IF NOT EXISTS logs_eventos (
         id SERIAL PRIMARY KEY,
@@ -43,56 +61,133 @@ const initDb = async () => {
       );
     `);
 
-    console.log("Tabelas 'dispositivos' e 'logs_eventos' criadas/verificadas com sucesso!");
+    console.log("Banco de dados sincronizado com tabelas de CFTV e Alarmes!");
   } catch (err) {
-    console.error("Erro ao inicializar tabelas no PostgreSQL:", err);
+    console.error("Erro ao inicializar banco:", err);
   }
 };
 
-// Executa a criação das tabelas ao iniciar
 initDb();
 
-// Rota de teste de status
-app.get('/api/status', (req, res) => {
-  res.json({
-    system: "GM TECH Access API",
-    status: "Online",
-    database: "Conectado ao PostgreSQL"
+// --- DECODER CONTACT ID ---
+function decodificarContactID(rawBuffer) {
+  const rawMsg = rawBuffer.toString('ascii');
+  
+  // Tabela rápida de eventos Contact ID comuns
+  const codigos = {
+    '1130': 'Disparo de Alarme - Conflito/Zona',
+    '1134': 'Disparo - Invasão de Perímetro',
+    '1381': 'Perda de Pulso - Cerca Elétrica',
+    '1401': 'Desarme pelo Usuário',
+    '3401': 'Arme pelo Usuário',
+    '1301': 'Falha de Energia AC',
+    '1120': 'Pânico Silencioso'
+  };
+
+  // Simulação de extração simples do payload da central
+  for (let code in codigos) {
+    if (rawMsg.includes(code)) {
+      return codigos[code];
+    }
+  }
+
+  return `Evento Contact ID Recebido: ${rawMsg.substring(0, 30)}`;
+}
+
+// --- SERVIDOR TCP PARA CENTRAIS DE ALARME IP ---
+const tcpServer = net.createServer((socket) => {
+  console.log('Central de alarme/eletrificador conectada via Socket IP');
+
+  socket.on('data', async (data) => {
+    const eventoTraduzido = decodificarContactID(data);
+    
+    try {
+      await pool.query(`
+        INSERT INTO logs_eventos (dispositivo_nome, tipo_dispositivo, fabricante, descricao_evento)
+        VALUES ('Central IP Geral', 'ALARME', 'Multi-Fabricante', $1);
+      `, [eventoTraduzido]);
+      
+      // Resposta ACK básica para a central não desconectar
+      socket.write(Buffer.from([0x06]));
+    } catch (err) {
+      console.error("Erro ao registrar pacote Contact ID:", err);
+    }
+  });
+
+  socket.on('error', (err) => {
+    console.log('Conexão com central de alarme encerrada com aviso');
   });
 });
 
-// Rota para listar os últimos eventos salvos no banco
+tcpServer.listen(tcpPort, () => {
+  console.log(`Receptor Contact ID / SIA escutando na porta TCP ${tcpPort}`);
+});
+
+// --- ROTAS DA API REST ---
+
+app.get('/api/status', (req, res) => {
+  res.json({ system: "GM TECH Access API", status: "Online", database: "PostgreSQL Conectado" });
+});
+
+// CFTV
+app.get('/api/cftv/cameras', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM cftv_cameras ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: "Erro ao buscar câmeras" });
+  }
+});
+
+app.post('/api/cftv/cameras', async (req, res) => {
+  const { nome, fabricante, ip, porta_onvif, usuario, senha, canal } = req.body;
+  let rtsp_url = "";
+  const ch = canal || 1;
+
+  if (fabricante.toLowerCase().includes("intelbras") || fabricante.toLowerCase().includes("dahua")) {
+    rtsp_url = `rtsp://${usuario}:${senha}@${ip}:554/cam/realmonitor?channel=${ch}&subtype=0`;
+  } else if (fabricante.toLowerCase().includes("hikvision")) {
+    rtsp_url = `rtsp://${usuario}:${senha}@${ip}:554/Streaming/Channels/${ch}01`;
+  } else {
+    rtsp_url = `rtsp://${usuario}:${senha}@${ip}:554/live/ch${ch}`;
+  }
+
+  try {
+    const query = `
+      INSERT INTO cftv_cameras (nome, fabricante, ip, porta_onvif, usuario, senha, rtsp_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+    `;
+    const result = await pool.query(query, [nome, fabricante, ip, porta_onvif || 80, usuario, senha, rtsp_url]);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Erro ao salvar câmera" });
+  }
+});
+
+// EVENTOS
 app.get('/api/eventos', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM logs_eventos ORDER BY recebido_em DESC LIMIT 20');
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: "Erro ao buscar eventos do banco" });
+    res.status(500).json({ error: "Erro ao buscar eventos" });
   }
 });
 
-// Rota para receber novos eventos de equipamentos e salvar no banco
 app.post('/api/eventos', async (req, res) => {
   const { dispositivo, tipo, fabricante, evento, status } = req.body;
-  
   try {
     const query = `
       INSERT INTO logs_eventos (dispositivo_nome, tipo_dispositivo, fabricante, descricao_evento, status_evento)
       VALUES ($1, $2, $3, $4, $5) RETURNING *;
     `;
-    const values = [dispositivo, tipo, fabricante, evento, status || 'SUCESSO'];
-    const result = await pool.query(query, values);
-
-    res.status(201).json({
-      message: "Evento salvo no banco de dados com sucesso!",
-      dados: result.rows[0]
-    });
+    const result = await pool.query(query, [dispositivo, tipo, fabricante, evento, status || 'SUCESSO']);
+    res.status(201).json({ message: "Evento registrado", dados: result.rows[0] });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Erro ao salvar evento no banco" });
+    res.status(500).json({ error: "Erro ao registrar evento" });
   }
 });
 
 app.listen(port, () => {
-  console.log(`Servidor GM TECH Access rodando na porta ${port}`);
+  console.log(`Servidor HTTP rodando na porta ${port}`);
 });
