@@ -22,8 +22,8 @@ const initDb = async () => {
       CREATE TABLE IF NOT EXISTS dispositivos (
         id SERIAL PRIMARY KEY,
         nome VARCHAR(100) NOT NULL,
-        tipo VARCHAR(50) NOT NULL, -- CFTV, ALARME, ACESSO, CERCA
-        fabricante VARCHAR(50) NOT NULL, -- Intelbras, Hikvision, Dahua, etc.
+        tipo VARCHAR(50) NOT NULL,
+        fabricante VARCHAR(50) NOT NULL,
         ip_host VARCHAR(100),
         status VARCHAR(20) DEFAULT 'ONLINE',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
