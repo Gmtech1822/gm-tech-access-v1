@@ -14,14 +14,16 @@
     .card { background-color: #1e293b; padding: 20px; border-radius: 10px; border: 1px solid #334155; }
     .card h3 { color: #94a3b8; font-size: 1rem; margin-bottom: 10px; }
     .card .value { font-size: 1.5rem; font-weight: bold; color: #f8fafc; }
-    .table-container { background-color: #1e293b; padding: 20px; border-radius: 10px; border: 1px solid #334155; }
-    .table-container h2 { margin-bottom: 15px; font-size: 1.2rem; color: #38bdf8; }
+    .table-container, .form-container { background-color: #1e293b; padding: 20px; border-radius: 10px; border: 1px solid #334155; margin-bottom: 30px; }
+    h2 { margin-bottom: 15px; font-size: 1.2rem; color: #38bdf8; }
     table { width: 100%; border-collapse: collapse; text-align: left; }
-    th, td { padding: 12px; border-bottom: 1px solid #334155; }
+    th, td { padding: 12px; border-bottom: 1px solid #334155; word-break: break-all; }
     th { color: #94a3b8; font-size: 0.9rem; }
     .badge-success { color: #4ade80; font-weight: bold; }
-    .btn-simular { background-color: #0284c7; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-    .btn-simular:hover { background-color: #0369a1; }
+    .btn { background-color: #0284c7; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .btn:hover { background-color: #0369a1; }
+    .form-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+    input, select { background-color: #0f172a; color: white; border: 1px solid #334155; padding: 10px; border-radius: 6px; flex: 1; min-width: 140px; }
   </style>
 </head>
 <body>
@@ -34,8 +36,8 @@
   <div class="grid">
     <div class="card">
       <h3>CFTV (DVR/NVR)</h3>
-      <div class="value">Intelbras / Hikvision</div>
-      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">RTSP / ONVIF Prontos</p>
+      <div class="value" id="total-cameras">0 Câmeras</div>
+      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">ONVIF & RTSP Ativos</p>
     </div>
     <div class="card">
       <h3>Controle de Acesso</h3>
@@ -54,10 +56,50 @@
     </div>
   </div>
 
+  <!-- CADASTRO DE CÂMERAS CFTV -->
+  <div class="form-container">
+    <h2>Módulo CFTV - Cadastrar Câmera / DVR (ONVIF/RTSP)</h2>
+    <form id="form-camera" onsubmit="cadastrarCamera(event)">
+      <div class="form-group">
+        <input type="text" id="cam-nome" placeholder="Nome (Ex: Portaria Main)" required>
+        <select id="cam-fabricante" required>
+          <option value="Intelbras">Intelbras</option>
+          <option value="Hikvision">Hikvision</option>
+          <option value="Dahua">Dahua</option>
+          <option value="Generica">Genérica ONVIF</option>
+        </select>
+        <input type="text" id="cam-ip" placeholder="IP / Host (Ex: 192.168.1.108)" required>
+        <input type="number" id="cam-porta" placeholder="Porta ONVIF" value="80">
+      </div>
+      <div class="form-group">
+        <input type="text" id="cam-user" placeholder="Usuário" value="admin" required>
+        <input type="password" id="cam-pass" placeholder="Senha" required>
+        <input type="number" id="cam-canal" placeholder="Canal DVR" value="1" min="1">
+        <button type="submit" class="btn">Adicionar Câmera</button>
+      </div>
+    </form>
+
+    <h3 style="margin-top: 20px; color: #94a3b8; font-size: 1rem;">Câmeras Cadastradas no Banco:</h3>
+    <table style="margin-top: 10px;">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Fabricante</th>
+          <th>IP</th>
+          <th>URL RTSP Gerada</th>
+        </tr>
+      </thead>
+      <tbody id="tabela-cameras">
+        <tr><td colspan="4" style="text-align: center; color: #64748b;">Nenhuma câmera cadastrada.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- EVENTOS RECENTES -->
   <div class="table-container">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-      <h2>Eventos Recentes em Tempo Real</h2>
-      <button class="btn-simular" onclick="simularEvento()">Simular Disparo / Passagem</button>
+      <h2>Logs de Eventos em Tempo Real</h2>
+      <button class="btn" onclick="simularEvento()">Simular Evento</button>
     </div>
     <table>
       <thead>
@@ -70,9 +112,7 @@
         </tr>
       </thead>
       <tbody id="tabela-eventos">
-        <tr>
-          <td colspan="5" style="text-align: center; color: #64748b;">Carregando eventos do banco PostgreSQL...</td>
-        </tr>
+        <tr><td colspan="5" style="text-align: center; color: #64748b;">Carregando eventos...</td></tr>
       </tbody>
     </table>
   </div>
@@ -80,7 +120,6 @@
   <script>
     const API_URL = 'https://gm-tech-api.onrender.com/api';
 
-    // Checa status da API
     async function checarStatus() {
       try {
         const res = await fetch(`${API_URL}/status`);
@@ -95,7 +134,57 @@
       }
     }
 
-    // Carrega eventos do PostgreSQL
+    async function carregarCameras() {
+      try {
+        const res = await fetch(`${API_URL}/cftv/cameras`);
+        const cameras = await res.json();
+        const tbody = document.getElementById('tabela-cameras');
+        document.getElementById('total-cameras').innerText = `${cameras.length} Câmeras`;
+
+        if (cameras.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #64748b;">Nenhuma câmera cadastrada.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = cameras.map(c => `
+          <tr>
+            <td><strong>${c.nome}</strong></td>
+            <td>${c.fabricante}</td>
+            <td>${c.ip}</td>
+            <td style="font-size: 0.8rem; color: #38bdf8;">${c.rtsp_url}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error("Erro ao buscar câmeras:", err);
+      }
+    }
+
+    async function cadastrarCamera(e) {
+      e.preventDefault();
+      const payload = {
+        nome: document.getElementById('cam-nome').value,
+        fabricante: document.getElementById('cam-fabricante').value,
+        ip: document.getElementById('cam-ip').value,
+        porta_onvif: document.getElementById('cam-porta').value,
+        usuario: document.getElementById('cam-user').value,
+        senha: document.getElementById('cam-pass').value,
+        canal: document.getElementById('cam-canal').value
+      };
+
+      try {
+        await fetch(`${API_URL}/cftv/cameras`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        document.getElementById('form-camera').reset();
+        carregarCameras();
+        carregarEventos();
+      } catch (err) {
+        alert("Erro ao cadastrar câmera");
+      }
+    }
+
     async function carregarEventos() {
       try {
         const res = await fetch(`${API_URL}/eventos`);
@@ -103,7 +192,7 @@
         const tbody = document.getElementById('tabela-eventos');
         
         if (eventos.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b;">Nenhum evento registrado no banco de dados.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b;">Nenhum evento registrado.</td></tr>';
           return;
         }
 
@@ -121,32 +210,27 @@
       }
     }
 
-    // Função para testar gravação no banco
     async function simularEvento() {
       const tipos = [
         { dispositivo: "DVR Portaria", tipo: "CFTV", fabricante: "Intelbras", evento: "Detecção de Movimento - Câmera 01" },
         { dispositivo: "Catraca Principal", tipo: "ACESSO", fabricante: "Control iD", evento: "Acesso Liberado - Cartão #4829" },
-        { dispositivo: "Central Zonas", tipo: "ALARME", fabricante: "JFL", evento: "Disparo de Alarme - Zona 04" },
-        { dispositivo: "Cerca Perímetro", tipo: "CERCA", fabricante: "Garen", evento: "Perda de Pulso - Setor Norte" }
+        { dispositivo: "Central Zonas", tipo: "ALARME", fabricante: "JFL", evento: "Disparo de Alarme - Zona 04" }
       ];
-
-      const eventoAleatorio = tipos[Math.floor(Math.random() * tipos.length)];
-
+      const ev = tipos[Math.floor(Math.random() * tipos.length)];
       try {
         await fetch(`${API_URL}/eventos`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(eventoAleatorio)
+          body: JSON.stringify(ev)
         });
-        carregarEventos(); // Recarrega a tabela
-      } catch (err) {
-        alert("Erro ao simular evento");
-      }
+        carregarEventos();
+      } catch (err) {}
     }
 
     checarStatus();
+    carregarCameras();
     carregarEventos();
-    setInterval(carregarEventos, 5000); // Atualiza a cada 5s
+    setInterval(carregarEventos, 5000);
   </script>
 </body>
 </html>
