@@ -10,7 +10,7 @@
     header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid #334155; margin-bottom: 20px; }
     h1 { color: #38bdf8; font-size: 1.8rem; }
     .status-badge { background-color: #22c55e; color: #000; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
     .card { background-color: #1e293b; padding: 20px; border-radius: 10px; border: 1px solid #334155; }
     .card h3 { color: #94a3b8; font-size: 1rem; margin-bottom: 10px; }
     .card .value { font-size: 1.5rem; font-weight: bold; color: #f8fafc; }
@@ -20,8 +20,12 @@
     th, td { padding: 12px; border-bottom: 1px solid #334155; word-break: break-all; }
     th { color: #94a3b8; font-size: 0.9rem; }
     .badge-success { color: #4ade80; font-weight: bold; }
+    .badge-danger { color: #f87171; font-weight: bold; }
+    .badge-warning { color: #facc15; font-weight: bold; }
     .btn { background-color: #0284c7; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
     .btn:hover { background-color: #0369a1; }
+    .btn-danger { background-color: #dc2626; }
+    .btn-danger:hover { background-color: #b91c1c; }
     .form-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
     input, select { background-color: #0f172a; color: white; border: 1px solid #334155; padding: 10px; border-radius: 6px; flex: 1; min-width: 140px; }
   </style>
@@ -40,25 +44,25 @@
       <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">ONVIF & RTSP Ativos</p>
     </div>
     <div class="card">
-      <h3>Controle de Acesso</h3>
-      <div class="value">Catracas & Leitores</div>
-      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Wiegand / OSDP</p>
-    </div>
-    <div class="card">
-      <h3>Central de Alarmes</h3>
-      <div class="value">Contact ID / SIA</div>
-      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Monitoramento IP</p>
+      <h3>Centrais de Alarme</h3>
+      <div class="value" id="total-alarmes">Contact ID / SIA</div>
+      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Receptor TCP Ativo</p>
     </div>
     <div class="card">
       <h3>Cerca Elétrica</h3>
       <div class="value">Eletrificadores</div>
-      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Status da Malha</p>
+      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Status da Malha OK</p>
+    </div>
+    <div class="card">
+      <h3>Controle de Acesso</h3>
+      <div class="value">Catracas & Leitores</div>
+      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Próximo Módulo</p>
     </div>
   </div>
 
-  <!-- CADASTRO DE CÂMERAS CFTV -->
+  <!-- MÓDULO 1: CFTV -->
   <div class="form-container">
-    <h2>Módulo CFTV - Cadastrar Câmera / DVR (ONVIF/RTSP)</h2>
+    <h2>Módulo 1: CFTV - Cadastrar Câmera / DVR (ONVIF/RTSP)</h2>
     <form id="form-camera" onsubmit="cadastrarCamera(event)">
       <div class="form-group">
         <input type="text" id="cam-nome" placeholder="Nome (Ex: Portaria Main)" required>
@@ -79,7 +83,7 @@
       </div>
     </form>
 
-    <h3 style="margin-top: 20px; color: #94a3b8; font-size: 1rem;">Câmeras Cadastradas no Banco:</h3>
+    <h3 style="margin-top: 20px; color: #94a3b8; font-size: 1rem;">Câmeras Cadastradas:</h3>
     <table style="margin-top: 10px;">
       <thead>
         <tr>
@@ -95,11 +99,24 @@
     </table>
   </div>
 
-  <!-- EVENTOS RECENTES -->
+  <!-- MÓDULO 2: CENTRAIS DE ALARME & CERCA ELÉTRICA -->
+  <div class="form-container">
+    <h2>Módulo 2: Centrais de Alarme & Cerca Elétrica (Contact ID / SIA)</h2>
+    <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 15px;">Simule disparos e pânicos direto no protocolo Contact ID para testar o receptor TCP:</p>
+    <div class="form-group">
+      <button class="btn btn-danger" onclick="simularContactID('1130', 'Central JFL - Zona 01', 'Disparo de Alarme - Sensor IVP')">🚨 Disparo Zona 01 (Alarme)</button>
+      <button class="btn btn-danger" onclick="simularContactID('1381', 'Cerca Elétrica Intelbras ELC', 'Perda de Pulso - Malha Cerca Perimetral')">⚡ Disparo Cerca Elétrica</button>
+      <button class="btn btn-danger" onclick="simularContactID('1120', 'Central Paradox', 'Pânico Silencioso - Portaria')">⚠️ Pânico Silencioso</button>
+      <button class="btn" onclick="simularContactID('3401', 'Central Intelbras AMT', 'Arme do Sistema pelo Usuário #02')">🔒 Armar Sistema</button>
+      <button class="btn" style="background-color: #16a34a;" onclick="simularContactID('1401', 'Central Intelbras AMT', 'Desarme do Sistema pelo Usuário #02')">🔓 Desarmar Sistema</button>
+    </div>
+  </div>
+
+  <!-- LOGS DE EVENTOS EM TEMPO REAL -->
   <div class="table-container">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
       <h2>Logs de Eventos em Tempo Real</h2>
-      <button class="btn" onclick="simularEvento()">Simular Evento</button>
+      <button class="btn" onclick="carregarEventos()">Atualizar Logs</button>
     </div>
     <table>
       <thead>
@@ -107,7 +124,7 @@
           <th>Dispositivo</th>
           <th>Tipo</th>
           <th>Fabricante</th>
-          <th>Evento</th>
+          <th>Evento / Mensagem</th>
           <th>Data/Hora</th>
         </tr>
       </thead>
@@ -185,6 +202,25 @@
       }
     }
 
+    async function simularContactID(codigo, central, eventoDesc) {
+      try {
+        await fetch(`${API_URL}/eventos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dispositivo: central,
+            tipo: "ALARME",
+            fabricante: "Contact ID IP",
+            evento: `[CID ${codigo}] ${eventoDesc}`,
+            status: codigo.startsWith('1') ? 'ALERTA' : 'SUCESSO'
+          })
+        });
+        carregarEventos();
+      } catch (err) {
+        alert("Erro ao enviar evento de alarme");
+      }
+    }
+
     async function carregarEventos() {
       try {
         const res = await fetch(`${API_URL}/eventos`);
@@ -196,35 +232,27 @@
           return;
         }
 
-        tbody.innerHTML = eventos.map(e => `
-          <tr>
-            <td><strong>${e.dispositivo_nome}</strong></td>
-            <td>${e.tipo_dispositivo}</td>
-            <td>${e.fabricante}</td>
-            <td><span class="badge-success">${e.descricao_evento}</span></td>
-            <td>${new Date(e.recebido_em).toLocaleString('pt-BR')}</td>
-          </tr>
-        `).join('');
+        tbody.innerHTML = eventos.map(e => {
+          let badgeClass = 'badge-success';
+          if (e.descricao_evento.includes('Disparo') || e.descricao_evento.includes('Pânico') || e.descricao_evento.includes('Perda')) {
+            badgeClass = 'badge-danger';
+          } else if (e.descricao_evento.includes('Arme')) {
+            badgeClass = 'badge-warning';
+          }
+
+          return `
+            <tr>
+              <td><strong>${e.dispositivo_nome}</strong></td>
+              <td>${e.tipo_dispositivo}</td>
+              <td>${e.fabricante}</td>
+              <td><span class="${badgeClass}">${e.descricao_evento}</span></td>
+              <td>${new Date(e.recebido_em).toLocaleString('pt-BR')}</td>
+            </tr>
+          `;
+        }).join('');
       } catch (err) {
         console.error("Erro ao carregar eventos:", err);
       }
-    }
-
-    async function simularEvento() {
-      const tipos = [
-        { dispositivo: "DVR Portaria", tipo: "CFTV", fabricante: "Intelbras", evento: "Detecção de Movimento - Câmera 01" },
-        { dispositivo: "Catraca Principal", tipo: "ACESSO", fabricante: "Control iD", evento: "Acesso Liberado - Cartão #4829" },
-        { dispositivo: "Central Zonas", tipo: "ALARME", fabricante: "JFL", evento: "Disparo de Alarme - Zona 04" }
-      ];
-      const ev = tipos[Math.floor(Math.random() * tipos.length)];
-      try {
-        await fetch(`${API_URL}/eventos`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ev)
-        });
-        carregarEventos();
-      } catch (err) {}
     }
 
     checarStatus();
