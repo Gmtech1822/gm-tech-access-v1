@@ -14,12 +14,15 @@
     body { background-color: #0f172a; color: #f8fafc; padding: 20px; }
     
     #login-screen { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
-    .login-card { background-color: #1e293b; padding: 30px; border-radius: 12px; border: 1px solid #334155; width: 100%; max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-    .login-card h2 { color: #38bdf8; text-align: center; margin-bottom: 20px; font-size: 1.5rem; }
+    .login-card { background-color: #1e293b; padding: 30px; border-radius: 12px; border: 1px solid #334155; width: 100%; max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; }
+    .login-logo { max-width: 160px; height: auto; margin-bottom: 15px; border-radius: 8px; }
+    .login-card h2 { color: #38bdf8; margin-bottom: 15px; font-size: 1.4rem; }
     
     #dashboard-screen { display: none; }
     header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid #334155; margin-bottom: 20px; }
-    h1 { color: #38bdf8; font-size: 1.8rem; }
+    .brand-container { display: flex; align-items: center; gap: 15px; }
+    .header-logo { max-height: 50px; width: auto; border-radius: 6px; }
+    h1 { color: #38bdf8; font-size: 1.6rem; }
     .status-badge { background-color: #22c55e; color: #000; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; }
     
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 25px; }
@@ -54,6 +57,7 @@
   <!-- TELA DE LOGIN -->
   <div id="login-screen">
     <div class="login-card">
+      <img src="IMG_20260802_161741.png.jpg" id="img-login-logo" alt="GM TECH Logo" class="login-logo" onerror="this.style.display='none'">
       <h2>GM TECH Access</h2>
       <p style="color: #94a3b8; text-align: center; margin-bottom: 20px; font-size: 0.9rem;">Entre com suas credenciais de operador</p>
       <form id="form-login" onsubmit="realizarLogin(event)">
@@ -70,9 +74,12 @@
   <!-- PAINEL PRINCIPAL -->
   <div id="dashboard-screen">
     <header>
-      <div>
-        <h1>GM TECH Access</h1>
-        <span style="font-size: 0.85rem; color: #94a3b8;">Operador: <strong id="user-nome" style="color: #38bdf8;">-</strong></span>
+      <div class="brand-container">
+        <img src="IMG_20260802_161741.png.jpg" id="img-header-logo" alt="GM TECH Logo" class="header-logo" onerror="this.style.display='none'">
+        <div>
+          <h1>GM TECH Access</h1>
+          <span style="font-size: 0.85rem; color: #94a3b8;">Operador: <strong id="user-nome" style="color: #38bdf8;">-</strong></span>
+        </div>
       </div>
       <div>
         <span class="status-badge" id="api-status">Conectando...</span>
@@ -525,8 +532,6 @@
       } catch (err) {}
     }
 
-    // --- FUNÇÕES DE EXPORTAÇÃO (CSV E PDF) ---
-
     function exportarCSV() {
       if (!listaEventosCache.length) return alert("Sem dados para exportar.");
       
@@ -552,15 +557,29 @@
       const doc = new jsPDF();
 
       doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, 210, 20, 'F');
-      
-      doc.setTextColor(56, 189, 248);
-      doc.setFontSize(16);
-      doc.text("GM TECH Access - Relatório de Auditoria", 14, 13);
+      doc.rect(0, 0, 210, 25, 'F');
+
+      const imgHeader = document.getElementById('img-header-logo');
+      if (imgHeader && imgHeader.complete && imgHeader.naturalWidth !== 0) {
+        try {
+          doc.addImage(imgHeader, 'JPEG', 14, 4, 16, 16);
+          doc.setTextColor(56, 189, 248);
+          doc.setFontSize(15);
+          doc.text("GM TECH Access - Relatório de Auditoria", 34, 15);
+        } catch(e) {
+          doc.setTextColor(56, 189, 248);
+          doc.setFontSize(15);
+          doc.text("GM TECH Access - Relatório de Auditoria", 14, 15);
+        }
+      } else {
+        doc.setTextColor(56, 189, 248);
+        doc.setFontSize(15);
+        doc.text("GM TECH Access - Relatório de Auditoria", 14, 15);
+      }
 
       doc.setTextColor(100);
       doc.setFontSize(10);
-      doc.text(`Gerado por: ${usuarioAtual.nome || 'Operador'} | Data: ${new Date().toLocaleString('pt-BR')}`, 14, 27);
+      doc.text(`Gerado por: ${usuarioAtual.nome || 'Operador'} | Data: ${new Date().toLocaleString('pt-BR')}`, 14, 32);
 
       const rows = listaEventosCache.map(e => [
         e.dispositivo_nome,
@@ -571,7 +590,7 @@
       ]);
 
       doc.autoTable({
-        startY: 32,
+        startY: 37,
         head: [['Dispositivo', 'Tipo', 'Fabricante', 'Evento', 'Data/Hora']],
         body: rows,
         headStyles: { fillColor: [2, 132, 199] },
