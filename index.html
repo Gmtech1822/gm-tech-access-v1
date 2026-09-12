@@ -26,6 +26,8 @@
     .btn:hover { background-color: #0369a1; }
     .btn-danger { background-color: #dc2626; }
     .btn-danger:hover { background-color: #b91c1c; }
+    .btn-success { background-color: #16a34a; }
+    .btn-success:hover { background-color: #15803d; }
     .form-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
     input, select { background-color: #0f172a; color: white; border: 1px solid #334155; padding: 10px; border-radius: 6px; flex: 1; min-width: 140px; }
   </style>
@@ -45,7 +47,7 @@
     </div>
     <div class="card">
       <h3>Centrais de Alarme</h3>
-      <div class="value" id="total-alarmes">Contact ID / SIA</div>
+      <div class="value">Contact ID / SIA</div>
       <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Receptor TCP Ativo</p>
     </div>
     <div class="card">
@@ -55,9 +57,50 @@
     </div>
     <div class="card">
       <h3>Controle de Acesso</h3>
-      <div class="value">Catracas & Leitores</div>
-      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Próximo Módulo</p>
+      <div class="value" id="total-usuarios">0 Usuários</div>
+      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Wiegand & Facial</p>
     </div>
+  </div>
+
+  <!-- MÓDULO 3: CONTROLE DE ACESSO (USUÁRIOS & COMANDOS) -->
+  <div class="form-container">
+    <h2>Módulo 3: Controle de Acesso - Cadastrar Pedestre / Morador</h2>
+    <form id="form-usuario" onsubmit="cadastrarUsuario(event)">
+      <div class="form-group">
+        <input type="text" id="usr-nome" placeholder="Nome Completo" required>
+        <input type="text" id="usr-doc" placeholder="CPF / RG" required>
+        <input type="text" id="usr-tag" placeholder="Código RFID / Tag (Wiegand)" required>
+        <select id="usr-permissao" required>
+          <option value="MORADOR">Morador</option>
+          <option value="VISITANTE">Visitante</option>
+          <option value="PRESTADOR">Prestador de Serviço</option>
+          <option value="FUNCIONARIO">Funcionário</option>
+        </select>
+        <button type="submit" class="btn btn-success">Cadastrar Usuário</button>
+      </div>
+    </form>
+
+    <h3 style="margin-top: 20px; color: #94a3b8; font-size: 1rem;">Acionamentos Remotos de Portas / Catracas:</h3>
+    <div class="form-group" style="margin-top: 10px;">
+      <button class="btn" onclick="acionarPorta('Catraca Ingressos', 'Control iD', 'Abertura Liberada Pedestre')">🔓 Abrir Catraca Entrada</button>
+      <button class="btn" onclick="acionarPorta('Cancela Veicular', 'Intelbras', 'Abertura Cancela Veículos')">🚗 Abrir Cancela Veicular</button>
+      <button class="btn btn-danger" onclick="acionarPorta('Porta Bloco A', 'Hikvision', 'Bloqueio de Emergência (Lockdown)')">🔒 Bloquear Todas as Portas</button>
+    </div>
+
+    <h3 style="margin-top: 20px; color: #94a3b8; font-size: 1rem;">Usuários Cadastrados no Banco:</h3>
+    <table style="margin-top: 10px;">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Documento</th>
+          <th>Tag/Cartão Wiegand</th>
+          <th>Perfil</th>
+        </tr>
+      </thead>
+      <tbody id="tabela-usuarios">
+        <tr><td colspan="4" style="text-align: center; color: #64748b;">Nenhum usuário cadastrado.</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <!-- MÓDULO 1: CFTV -->
@@ -102,7 +145,6 @@
   <!-- MÓDULO 2: CENTRAIS DE ALARME & CERCA ELÉTRICA -->
   <div class="form-container">
     <h2>Módulo 2: Centrais de Alarme & Cerca Elétrica (Contact ID / SIA)</h2>
-    <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 15px;">Simule disparos e pânicos direto no protocolo Contact ID para testar o receptor TCP:</p>
     <div class="form-group">
       <button class="btn btn-danger" onclick="simularContactID('1130', 'Central JFL - Zona 01', 'Disparo de Alarme - Sensor IVP')">🚨 Disparo Zona 01 (Alarme)</button>
       <button class="btn btn-danger" onclick="simularContactID('1381', 'Cerca Elétrica Intelbras ELC', 'Perda de Pulso - Malha Cerca Perimetral')">⚡ Disparo Cerca Elétrica</button>
@@ -148,6 +190,67 @@
       } catch (err) {
         document.getElementById('api-status').innerText = "API OFFLINE";
         document.getElementById('api-status').style.backgroundColor = "#ef4444";
+      }
+    }
+
+    async function carregarUsuarios() {
+      try {
+        const res = await fetch(`${API_URL}/acesso/usuarios`);
+        const usuarios = await res.json();
+        const tbody = document.getElementById('tabela-usuarios');
+        document.getElementById('total-usuarios').innerText = `${usuarios.length} Usuários`;
+
+        if (usuarios.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #64748b;">Nenhum usuário cadastrado.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = usuarios.map(u => `
+          <tr>
+            <td><strong>${u.nome}</strong></td>
+            <td>${u.documento}</td>
+            <td><code style="color: #38bdf8;">${u.cartao_tag}</code></td>
+            <td><span class="badge-success">${u.tipo_permissao}</span></td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error("Erro ao buscar usuários:", err);
+      }
+    }
+
+    async function cadastrarUsuario(e) {
+      e.preventDefault();
+      const payload = {
+        nome: document.getElementById('usr-nome').value,
+        documento: document.getElementById('usr-doc').value,
+        cartao_tag: document.getElementById('usr-tag').value,
+        tipo_permissao: document.getElementById('usr-permissao').value
+      };
+
+      try {
+        await fetch(`${API_URL}/acesso/usuarios`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        document.getElementById('form-usuario').reset();
+        carregarUsuarios();
+        carregarEventos();
+      } catch (err) {
+        alert("Erro ao cadastrar usuário");
+      }
+    }
+
+    async function acionarPorta(dispositivo, fabricante, acao) {
+      try {
+        await fetch(`${API_URL}/acesso/acionar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dispositivo, fabricante, acao })
+        });
+        carregarEventos();
+      } catch (err) {
+        alert("Erro ao enviar comando");
       }
     }
 
@@ -216,9 +319,7 @@
           })
         });
         carregarEventos();
-      } catch (err) {
-        alert("Erro ao enviar evento de alarme");
-      }
+      } catch (err) {}
     }
 
     async function carregarEventos() {
@@ -234,7 +335,7 @@
 
         tbody.innerHTML = eventos.map(e => {
           let badgeClass = 'badge-success';
-          if (e.descricao_evento.includes('Disparo') || e.descricao_evento.includes('Pânico') || e.descricao_evento.includes('Perda')) {
+          if (e.descricao_evento.includes('Disparo') || e.descricao_evento.includes('Pânico') || e.descricao_evento.includes('Bloqueio')) {
             badgeClass = 'badge-danger';
           } else if (e.descricao_evento.includes('Arme')) {
             badgeClass = 'badge-warning';
@@ -250,13 +351,12 @@
             </tr>
           `;
         }).join('');
-      } catch (err) {
-        console.error("Erro ao carregar eventos:", err);
-      }
+      } catch (err) {}
     }
 
     checarStatus();
     carregarCameras();
+    carregarUsuarios();
     carregarEventos();
     setInterval(carregarEventos, 5000);
   </script>
