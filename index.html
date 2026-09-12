@@ -7,6 +7,14 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     body { background-color: #0f172a; color: #f8fafc; padding: 20px; }
+    
+    /* TELA DE LOGIN */
+    #login-screen { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+    .login-card { background-color: #1e293b; padding: 30px; border-radius: 12px; border: 1px solid #334155; width: 100%; max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .login-card h2 { color: #38bdf8; text-align: center; margin-bottom: 20px; font-size: 1.5rem; }
+    
+    /* PAINEL PRINCIPAL */
+    #dashboard-screen { display: none; }
     header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid #334155; margin-bottom: 20px; }
     h1 { color: #38bdf8; font-size: 1.8rem; }
     .status-badge { background-color: #22c55e; color: #000; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; }
@@ -28,156 +36,244 @@
     .btn-danger:hover { background-color: #b91c1c; }
     .btn-success { background-color: #16a34a; }
     .btn-success:hover { background-color: #15803d; }
-    .form-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+    .form-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+    .form-group-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
     input, select { background-color: #0f172a; color: white; border: 1px solid #334155; padding: 10px; border-radius: 6px; flex: 1; min-width: 140px; }
   </style>
 </head>
 <body>
 
-  <header>
-    <h1>GM TECH Access</h1>
-    <span class="status-badge" id="api-status">Conectando...</span>
-  </header>
-
-  <div class="grid">
-    <div class="card">
-      <h3>CFTV (DVR/NVR)</h3>
-      <div class="value" id="total-cameras">0 Câmeras</div>
-      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">ONVIF & RTSP Ativos</p>
-    </div>
-    <div class="card">
-      <h3>Centrais de Alarme</h3>
-      <div class="value">Contact ID / SIA</div>
-      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Receptor TCP Ativo</p>
-    </div>
-    <div class="card">
-      <h3>Cerca Elétrica</h3>
-      <div class="value">Eletrificadores</div>
-      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Status da Malha OK</p>
-    </div>
-    <div class="card">
-      <h3>Controle de Acesso</h3>
-      <div class="value" id="total-usuarios">0 Usuários</div>
-      <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Wiegand & Facial</p>
+  <!-- TELA DE LOGIN -->
+  <div id="login-screen">
+    <div class="login-card">
+      <h2>GM TECH Access</h2>
+      <p style="color: #94a3b8; text-align: center; margin-bottom: 20px; font-size: 0.9rem;">Entre com suas credenciais de operador</p>
+      <form id="form-login" onsubmit="realizarLogin(event)">
+        <div class="form-group">
+          <input type="email" id="login-email" placeholder="E-mail" value="admin@gmtech.com" required>
+          <input type="password" id="login-senha" placeholder="Senha" value="admin123" required>
+          <button type="submit" class="btn" style="padding: 12px; margin-top: 10px;">Entrar no Sistema</button>
+        </div>
+      </form>
+      <p id="login-erro" style="color: #f87171; text-align: center; margin-top: 15px; font-size: 0.85rem; display: none;"></p>
     </div>
   </div>
 
-  <!-- MÓDULO 3: CONTROLE DE ACESSO (USUÁRIOS & COMANDOS) -->
-  <div class="form-container">
-    <h2>Módulo 3: Controle de Acesso - Cadastrar Pedestre / Morador</h2>
-    <form id="form-usuario" onsubmit="cadastrarUsuario(event)">
-      <div class="form-group">
-        <input type="text" id="usr-nome" placeholder="Nome Completo" required>
-        <input type="text" id="usr-doc" placeholder="CPF / RG" required>
-        <input type="text" id="usr-tag" placeholder="Código RFID / Tag (Wiegand)" required>
-        <select id="usr-permissao" required>
-          <option value="MORADOR">Morador</option>
-          <option value="VISITANTE">Visitante</option>
-          <option value="PRESTADOR">Prestador de Serviço</option>
-          <option value="FUNCIONARIO">Funcionário</option>
-        </select>
-        <button type="submit" class="btn btn-success">Cadastrar Usuário</button>
+  <!-- PAINEL PRINCIPAL -->
+  <div id="dashboard-screen">
+    <header>
+      <div>
+        <h1>GM TECH Access</h1>
+        <span style="font-size: 0.85rem; color: #94a3b8;">Operador: <strong id="user-nome" style="color: #38bdf8;">-</strong></span>
       </div>
-    </form>
-
-    <h3 style="margin-top: 20px; color: #94a3b8; font-size: 1rem;">Acionamentos Remotos de Portas / Catracas:</h3>
-    <div class="form-group" style="margin-top: 10px;">
-      <button class="btn" onclick="acionarPorta('Catraca Ingressos', 'Control iD', 'Abertura Liberada Pedestre')">🔓 Abrir Catraca Entrada</button>
-      <button class="btn" onclick="acionarPorta('Cancela Veicular', 'Intelbras', 'Abertura Cancela Veículos')">🚗 Abrir Cancela Veicular</button>
-      <button class="btn btn-danger" onclick="acionarPorta('Porta Bloco A', 'Hikvision', 'Bloqueio de Emergência (Lockdown)')">🔒 Bloquear Todas as Portas</button>
-    </div>
-
-    <h3 style="margin-top: 20px; color: #94a3b8; font-size: 1rem;">Usuários Cadastrados no Banco:</h3>
-    <table style="margin-top: 10px;">
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th>Documento</th>
-          <th>Tag/Cartão Wiegand</th>
-          <th>Perfil</th>
-        </tr>
-      </thead>
-      <tbody id="tabela-usuarios">
-        <tr><td colspan="4" style="text-align: center; color: #64748b;">Nenhum usuário cadastrado.</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- MÓDULO 1: CFTV -->
-  <div class="form-container">
-    <h2>Módulo 1: CFTV - Cadastrar Câmera / DVR (ONVIF/RTSP)</h2>
-    <form id="form-camera" onsubmit="cadastrarCamera(event)">
-      <div class="form-group">
-        <input type="text" id="cam-nome" placeholder="Nome (Ex: Portaria Main)" required>
-        <select id="cam-fabricante" required>
-          <option value="Intelbras">Intelbras</option>
-          <option value="Hikvision">Hikvision</option>
-          <option value="Dahua">Dahua</option>
-          <option value="Generica">Genérica ONVIF</option>
-        </select>
-        <input type="text" id="cam-ip" placeholder="IP / Host (Ex: 192.168.1.108)" required>
-        <input type="number" id="cam-porta" placeholder="Porta ONVIF" value="80">
+      <div>
+        <span class="status-badge" id="api-status">Conectando...</span>
+        <button class="btn btn-danger" style="margin-left: 10px; padding: 6px 12px; font-size: 0.8rem;" onclick="logout()">Sair</button>
       </div>
-      <div class="form-group">
-        <input type="text" id="cam-user" placeholder="Usuário" value="admin" required>
-        <input type="password" id="cam-pass" placeholder="Senha" required>
-        <input type="number" id="cam-canal" placeholder="Canal DVR" value="1" min="1">
-        <button type="submit" class="btn">Adicionar Câmera</button>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <h3>CFTV (DVR/NVR)</h3>
+        <div class="value" id="total-cameras">0 Câmeras</div>
+        <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">ONVIF & RTSP Ativos</p>
       </div>
-    </form>
-
-    <h3 style="margin-top: 20px; color: #94a3b8; font-size: 1rem;">Câmeras Cadastradas:</h3>
-    <table style="margin-top: 10px;">
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th>Fabricante</th>
-          <th>IP</th>
-          <th>URL RTSP Gerada</th>
-        </tr>
-      </thead>
-      <tbody id="tabela-cameras">
-        <tr><td colspan="4" style="text-align: center; color: #64748b;">Nenhuma câmera cadastrada.</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- MÓDULO 2: CENTRAIS DE ALARME & CERCA ELÉTRICA -->
-  <div class="form-container">
-    <h2>Módulo 2: Centrais de Alarme & Cerca Elétrica (Contact ID / SIA)</h2>
-    <div class="form-group">
-      <button class="btn btn-danger" onclick="simularContactID('1130', 'Central JFL - Zona 01', 'Disparo de Alarme - Sensor IVP')">🚨 Disparo Zona 01 (Alarme)</button>
-      <button class="btn btn-danger" onclick="simularContactID('1381', 'Cerca Elétrica Intelbras ELC', 'Perda de Pulso - Malha Cerca Perimetral')">⚡ Disparo Cerca Elétrica</button>
-      <button class="btn btn-danger" onclick="simularContactID('1120', 'Central Paradox', 'Pânico Silencioso - Portaria')">⚠️ Pânico Silencioso</button>
-      <button class="btn" onclick="simularContactID('3401', 'Central Intelbras AMT', 'Arme do Sistema pelo Usuário #02')">🔒 Armar Sistema</button>
-      <button class="btn" style="background-color: #16a34a;" onclick="simularContactID('1401', 'Central Intelbras AMT', 'Desarme do Sistema pelo Usuário #02')">🔓 Desarmar Sistema</button>
+      <div class="card">
+        <h3>Centrais de Alarme</h3>
+        <div class="value">Contact ID / SIA</div>
+        <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Receptor TCP Ativo</p>
+      </div>
+      <div class="card">
+        <h3>Cerca Elétrica</h3>
+        <div class="value">Eletrificadores</div>
+        <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Status da Malha OK</p>
+      </div>
+      <div class="card">
+        <h3>Controle de Acesso</h3>
+        <div class="value" id="total-usuarios">0 Usuários</div>
+        <p style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">Wiegand & Facial</p>
+      </div>
     </div>
-  </div>
 
-  <!-- LOGS DE EVENTOS EM TEMPO REAL -->
-  <div class="table-container">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-      <h2>Logs de Eventos em Tempo Real</h2>
-      <button class="btn" onclick="carregarEventos()">Atualizar Logs</button>
+    <!-- MÓDULO 3: CONTROLE DE ACESSO -->
+    <div class="form-container">
+      <h2>Módulo 3: Controle de Acesso - Cadastrar Pedestre / Morador</h2>
+      <form id="form-usuario" onsubmit="cadastrarUsuario(event)">
+        <div class="form-group-row">
+          <input type="text" id="usr-nome" placeholder="Nome Completo" required>
+          <input type="text" id="usr-doc" placeholder="CPF / RG" required>
+          <input type="text" id="usr-tag" placeholder="Código RFID / Tag (Wiegand)" required>
+          <select id="usr-permissao" required>
+            <option value="MORADOR">Morador</option>
+            <option value="VISITANTE">Visitante</option>
+            <option value="PRESTADOR">Prestador de Serviço</option>
+            <option value="FUNCIONARIO">Funcionário</option>
+          </select>
+          <button type="submit" class="btn btn-success">Cadastrar Usuário</button>
+        </div>
+      </form>
+
+      <h3 style="margin-top: 20px; color: #94a3b8; font-size: 1rem;">Acionamentos Remotos de Portas / Catracas:</h3>
+      <div class="form-group-row" style="margin-top: 10px;">
+        <button class="btn" onclick="acionarPorta('Catraca Ingressos', 'Control iD', 'Abertura Liberada Pedestre')">🔓 Abrir Catraca Entrada</button>
+        <button class="btn" onclick="acionarPorta('Cancela Veicular', 'Intelbras', 'Abertura Cancela Veículos')">🚗 Abrir Cancela Veicular</button>
+        <button class="btn btn-danger" onclick="acionarPorta('Porta Bloco A', 'Hikvision', 'Bloqueio de Emergência (Lockdown)')">🔒 Bloquear Todas as Portas</button>
+      </div>
+
+      <h3 style="margin-top: 20px; color: #94a3b8; font-size: 1rem;">Usuários Cadastrados no Banco:</h3>
+      <table style="margin-top: 10px;">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Documento</th>
+            <th>Tag/Cartão Wiegand</th>
+            <th>Perfil</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-usuarios">
+          <tr><td colspan="4" style="text-align: center; color: #64748b;">Nenhum usuário cadastrado.</td></tr>
+        </tbody>
+      </table>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Dispositivo</th>
-          <th>Tipo</th>
-          <th>Fabricante</th>
-          <th>Evento / Mensagem</th>
-          <th>Data/Hora</th>
-        </tr>
-      </thead>
-      <tbody id="tabela-eventos">
-        <tr><td colspan="5" style="text-align: center; color: #64748b;">Carregando eventos...</td></tr>
-      </tbody>
-    </table>
+
+    <!-- MÓDULO 1: CFTV -->
+    <div class="form-container">
+      <h2>Módulo 1: CFTV - Cadastrar Câmera / DVR (ONVIF/RTSP)</h2>
+      <form id="form-camera" onsubmit="cadastrarCamera(event)">
+        <div class="form-group-row">
+          <input type="text" id="cam-nome" placeholder="Nome (Ex: Portaria Main)" required>
+          <select id="cam-fabricante" required>
+            <option value="Intelbras">Intelbras</option>
+            <option value="Hikvision">Hikvision</option>
+            <option value="Dahua">Dahua</option>
+            <option value="Generica">Genérica ONVIF</option>
+          </select>
+          <input type="text" id="cam-ip" placeholder="IP / Host (Ex: 192.168.1.108)" required>
+          <input type="number" id="cam-porta" placeholder="Porta ONVIF" value="80">
+        </div>
+        <div class="form-group-row">
+          <input type="text" id="cam-user" placeholder="Usuário" value="admin" required>
+          <input type="password" id="cam-pass" placeholder="Senha" required>
+          <input type="number" id="cam-canal" placeholder="Canal DVR" value="1" min="1">
+          <button type="submit" class="btn">Adicionar Câmera</button>
+        </div>
+      </form>
+
+      <h3 style="margin-top: 20px; color: #94a3b8; font-size: 1rem;">Câmeras Cadastradas:</h3>
+      <table style="margin-top: 10px;">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Fabricante</th>
+            <th>IP</th>
+            <th>URL RTSP Gerada</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-cameras">
+          <tr><td colspan="4" style="text-align: center; color: #64748b;">Nenhuma câmera cadastrada.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- MÓDULO 2: CENTRAIS DE ALARME & CERCA ELÉTRICA -->
+    <div class="form-container">
+      <h2>Módulo 2: Centrais de Alarme & Cerca Elétrica (Contact ID / SIA)</h2>
+      <div class="form-group-row">
+        <button class="btn btn-danger" onclick="simularContactID('1130', 'Central JFL - Zona 01', 'Disparo de Alarme - Sensor IVP')">🚨 Disparo Zona 01 (Alarme)</button>
+        <button class="btn btn-danger" onclick="simularContactID('1381', 'Cerca Elétrica Intelbras ELC', 'Perda de Pulso - Malha Cerca Perimetral')">⚡ Disparo Cerca Elétrica</button>
+        <button class="btn btn-danger" onclick="simularContactID('1120', 'Central Paradox', 'Pânico Silencioso - Portaria')">⚠️ Pânico Silencioso</button>
+        <button class="btn" onclick="simularContactID('3401', 'Central Intelbras AMT', 'Arme do Sistema pelo Usuário #02')">🔒 Armar Sistema</button>
+        <button class="btn" style="background-color: #16a34a;" onclick="simularContactID('1401', 'Central Intelbras AMT', 'Desarme do Sistema pelo Usuário #02')">🔓 Desarmar Sistema</button>
+      </div>
+    </div>
+
+    <!-- LOGS DE EVENTOS EM TEMPO REAL -->
+    <div class="table-container">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2>Logs de Eventos em Tempo Real</h2>
+        <button class="btn" onclick="carregarEventos()">Atualizar Logs</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Dispositivo</th>
+            <th>Tipo</th>
+            <th>Fabricante</th>
+            <th>Evento / Mensagem</th>
+            <th>Data/Hora</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-eventos">
+          <tr><td colspan="5" style="text-align: center; color: #64748b;">Carregando eventos...</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <script>
     const API_URL = 'https://gm-tech-api.onrender.com/api';
+    let tokenJWT = localStorage.getItem('gmtech_token');
+    let usuarioAtual = JSON.parse(localStorage.getItem('gmtech_user') || '{}');
+
+    function getHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenJWT}`
+      };
+    }
+
+    function verificarSessao() {
+      if (tokenJWT) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('dashboard-screen').style.display = 'block';
+        document.getElementById('user-nome').innerText = usuarioAtual.nome || 'Operador';
+        checarStatus();
+        carregarCameras();
+        carregarUsuarios();
+        carregarEventos();
+      } else {
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('dashboard-screen').style.display = 'none';
+      }
+    }
+
+    async function realizarLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const senha = document.getElementById('login-senha').value;
+      const erroEl = document.getElementById('login-erro');
+
+      try {
+        const res = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, senha })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          tokenJWT = data.token;
+          usuarioAtual = data.operador;
+          localStorage.setItem('gmtech_token', tokenJWT);
+          localStorage.setItem('gmtech_user', JSON.stringify(usuarioAtual));
+          erroEl.style.display = 'none';
+          verificarSessao();
+        } else {
+          erroEl.innerText = data.error || 'Erro ao realizar login';
+          erroEl.style.display = 'block';
+        }
+      } catch (err) {
+        erroEl.innerText = 'Servidor indisponível';
+        erroEl.style.display = 'block';
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('gmtech_token');
+      localStorage.removeItem('gmtech_user');
+      tokenJWT = null;
+      verificarSessao();
+    }
 
     async function checarStatus() {
       try {
@@ -195,7 +291,7 @@
 
     async function carregarUsuarios() {
       try {
-        const res = await fetch(`${API_URL}/acesso/usuarios`);
+        const res = await fetch(`${API_URL}/acesso/usuarios`, { headers: getHeaders() });
         const usuarios = await res.json();
         const tbody = document.getElementById('tabela-usuarios');
         document.getElementById('total-usuarios').innerText = `${usuarios.length} Usuários`;
@@ -230,7 +326,7 @@
       try {
         await fetch(`${API_URL}/acesso/usuarios`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getHeaders(),
           body: JSON.stringify(payload)
         });
         document.getElementById('form-usuario').reset();
@@ -245,7 +341,7 @@
       try {
         await fetch(`${API_URL}/acesso/acionar`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getHeaders(),
           body: JSON.stringify({ dispositivo, fabricante, acao })
         });
         carregarEventos();
@@ -256,7 +352,7 @@
 
     async function carregarCameras() {
       try {
-        const res = await fetch(`${API_URL}/cftv/cameras`);
+        const res = await fetch(`${API_URL}/cftv/cameras`, { headers: getHeaders() });
         const cameras = await res.json();
         const tbody = document.getElementById('tabela-cameras');
         document.getElementById('total-cameras').innerText = `${cameras.length} Câmeras`;
@@ -294,7 +390,7 @@
       try {
         await fetch(`${API_URL}/cftv/cameras`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getHeaders(),
           body: JSON.stringify(payload)
         });
         document.getElementById('form-camera').reset();
@@ -309,7 +405,7 @@
       try {
         await fetch(`${API_URL}/eventos`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getHeaders(),
           body: JSON.stringify({
             dispositivo: central,
             tipo: "ALARME",
@@ -324,7 +420,7 @@
 
     async function carregarEventos() {
       try {
-        const res = await fetch(`${API_URL}/eventos`);
+        const res = await fetch(`${API_URL}/eventos`, { headers: getHeaders() });
         const eventos = await res.json();
         const tbody = document.getElementById('tabela-eventos');
         
@@ -354,11 +450,10 @@
       } catch (err) {}
     }
 
-    checarStatus();
-    carregarCameras();
-    carregarUsuarios();
-    carregarEventos();
-    setInterval(carregarEventos, 5000);
+    verificarSessao();
+    setInterval(() => {
+      if(tokenJWT) carregarEventos();
+    }, 5000);
   </script>
 </body>
 </html>
